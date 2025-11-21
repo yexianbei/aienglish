@@ -1,0 +1,26 @@
+{
+  "name": "aienglish",
+  "version": "1.0.0",
+  "description": "AI English Learning App - 基于 OpenAI Apps SDK 的英语学习应用",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=packages/backend & npm run dev --workspace=packages/frontend",
+    "dev:backend": "npm run dev --workspace=packages/backend",
+    "dev:frontend": "npm run dev --workspace=packages/frontend",
+    "build": "npm run build --workspaces",
+    "start": "npm run start --workspace=packages/backend"
+  },
+  "keywords": [
+    "openai",
+    "english",
+    "learning",
+    "vocabulary",
+    "spaced-repetition"
+  ],
+  "author": "",
+  "license": "MIT"
+}
+

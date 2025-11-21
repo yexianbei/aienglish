@@ -1,0 +1,38 @@
+{
+  "name": "AI English Learning",
+  "description": "智能英语学习助手 - 在聊天中收集生词，通过艾宾浩斯记忆曲线高效复习",
+  "version": "1.0.0",
+  "developer": {
+    "name": "Your Name",
+    "url": "https://your-domain.com",
+    "email": "your-email@example.com"
+  },
+  "logo": {
+    "url": "https://your-domain.com/logo.png",
+    "alt": "AI English Logo"
+  },
+  "permissions": [
+    "context.read",
+    "user.read"
+  ],
+  "entry_point": {
+    "type": "iframe",
+    "url": "https://your-domain.com/chatgpt-app"
+  },
+  "triggers": [
+    {
+      "type": "button",
+      "text": "📝 加入生词本",
+      "description": "将翻译的单词或短语添加到生词本",
+      "placement": ["message_actions"]
+    }
+  ],
+  "capabilities": [
+    "translation",
+    "vocabulary_tracking",
+    "spaced_repetition"
+  ],
+  "privacy_policy": "https://your-domain.com/privacy",
+  "terms_of_service": "https://your-domain.com/terms"
+}
+
