@@ -37,6 +37,38 @@ router.post('/register', async (req: Request, res: Response) => {
     // 检查邮箱是否已注册
     const existing = await User.findOne({ email: email.toLowerCase() });
     if (existing) {
+      // 如果是通过 MCP 预创建的账号（fromMcp = true 且使用占位密码），允许用户“完成注册”
+      if (existing.fromMcp && existing.password === 'mcp-no-login') {
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        existing.password = hashedPassword;
+        if (username) {
+          existing.username = username;
+        }
+        await existing.save();
+
+        const token = jwt.sign(
+          { userId: existing._id.toString(), email: existing.email },
+          getJwtSecret(),
+          { expiresIn: '7d' }
+        );
+
+        Log.success('MCP 预创建用户完成注册', {
+          userId: existing._id,
+          email: existing.email,
+        });
+
+        return res.status(200).json({
+          token,
+          user: {
+            id: existing._id,
+            email: existing.email,
+            username: existing.username,
+          },
+        });
+      }
+
+      // 否则正常提示已注册
       return res.status(409).json({ error: '该邮箱已注册，请直接登录' });
     }
 

@@ -28,6 +28,14 @@ const UserSchema = new Schema<IUserDocument>({
     type: String,
     sparse: true
   },
+  /**
+   * 标记该用户是否最初是通过 MCP / ChatGPT 自动创建的
+   * 方便之后在前端注册时进行账号“补全”而不是阻止注册
+   */
+  fromMcp: {
+    type: Boolean,
+    default: false
+  },
   createdAt: {
     type: Date,
     default: Date.now
