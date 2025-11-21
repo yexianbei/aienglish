@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { authAPI } from '../services/api';
 
 export const LoginPage: React.FC = () => {
@@ -81,12 +82,12 @@ export const LoginPage: React.FC = () => {
 
         <p className="mt-4 text-center text-sm text-gray-500">
           还没有账号？{' '}
-          <a
-            href="/register"
+          <Link
+            to="/register"
             className="text-primary-600 hover:text-primary-700 font-medium"
           >
             去注册
-          </a>
+          </Link>
         </p>
       </div>
     </div>
