@@ -70,6 +70,20 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 <BookOpen className="w-5 h-5" />
                 <span className="font-medium">生词本</span>
               </Link>
+
+              {/* 登录/注册入口 */}
+              <Link
+                to="/login"
+                className={`
+                  ml-2 flex items-center gap-2 px-4 py-2 rounded-lg transition-colors
+                  ${isActive('/login') || isActive('/register')
+                    ? 'bg-gray-900 text-white'
+                    : 'text-gray-600 hover:bg-gray-50'
+                  }
+                `}
+              >
+                <span className="font-medium">登录 / 注册</span>
+              </Link>
             </div>
           </div>
         </div>
