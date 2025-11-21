@@ -43,7 +43,12 @@ export interface IUser {
   username: string;
   email: string;
   password: string;
-  openaiUserId?: string; // OpenAI 用户 ID
+  openaiUserId?: string; // OpenAI 用户 ID（用于 MCP 绑定）
+  /**
+   * 标记该用户是否最初是通过 MCP / ChatGPT 自动创建的
+   * 用于之后在 Web 端完成注册时做账号“补全”
+   */
+  fromMcp?: boolean;
   createdAt: Date;
   lastLoginAt?: Date;
 }
