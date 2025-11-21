@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { authAPI } from '../services/api';
 
 export const RegisterPage: React.FC = () => {
@@ -7,6 +7,7 @@ export const RegisterPage: React.FC = () => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -19,7 +20,8 @@ export const RegisterPage: React.FC = () => {
       localStorage.setItem('authToken', result.token);
       localStorage.setItem('authUser', JSON.stringify(result.user));
 
-      window.location.href = '/';
+      // 注册成功后直接跳转到首页
+      navigate('/', { replace: true });
     } catch (err: any) {
       const message = err.response?.data?.error || '注册失败，请稍后重试';
       setError(message);
