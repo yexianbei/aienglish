@@ -14,14 +14,25 @@ const AddWordInputSchema = z.object({
   context: z.string().optional(),
   userRating: z.enum(['unknown', 'vague', 'mastered']).default('unknown'),
   /**
-   * ChatGPT / Apps SDK 提供的用户唯一标识
-   * 具体字段名需要在 Apps SDK 侧按文档配置，这里只要保证能拿到一个稳定的 ID 即可
+   * ChatGPT / Developer Mode 提供的用户唯一标识
+   * 在工具调用时需要显式传入（openaiUserId）
    */
   openaiUserId: z.string().min(1),
 });
 
-const replyMessage = (message: string) => ({
-  content: [{ type: 'text' as const, text: message }],
+const ViewWordbookInputSchema = z.object({
+  /**
+   * ChatGPT / Developer Mode 提供的用户唯一标识
+   */
+  openaiUserId: z.string().min(1),
+  /**
+   * 第几页（从 1 开始），默认 1
+   */
+  page: z.number().int().min(1).optional().default(1),
+  /**
+   * 每页数量，默认 20，最大 50
+   */
+  limit: z.number().int().min(1).max(50).optional().default(20),
 });
 
 const getJwtSecret = () => {
@@ -108,7 +119,7 @@ export function createMcpServer() {
             text: `已为你添加单词 "${wordRecord.word}"，当前掌握等级为 ${wordRecord.masteryLevel}，未来会根据艾宾浩斯记忆曲线提醒你复习。`,
           },
         ],
-        // 可选：把 JWT 返回给 Apps SDK，用于 iframe UI 等场景复用
+        // 可选：把 JWT 返回给调用方，用于其他场景复用
         structuredContent: {
           user: {
             id: user._id.toString(),
@@ -121,6 +132,87 @@ export function createMcpServer() {
             word: wordRecord.word,
             translation: wordRecord.translation,
           },
+        },
+      };
+    }
+  );
+
+  /**
+   * 工具：查看当前 ChatGPT 用户对应的生词本
+   * 通过 openaiUserId 映射到本地用户，然后列出该用户的单词列表
+   */
+  server.registerTool(
+    'view_wordbook',
+    {
+      title: '查看生词本',
+      description:
+        '查看当前 ChatGPT 用户的生词本列表（包含单词、翻译、掌握等级等信息）。',
+      inputSchema: ViewWordbookInputSchema,
+    },
+    async (args) => {
+      const input = ViewWordbookInputSchema.parse(args);
+
+      const { user } = await getOrCreateUserAndToken(input.openaiUserId);
+
+      Log.info('MCP view_wordbook 调用', {
+        openaiUserId: input.openaiUserId,
+        userId: user._id,
+        page: input.page,
+        limit: input.limit,
+      });
+
+      const page = input.page ?? 1;
+      const limit = input.limit ?? 20;
+
+      const { words, pagination } = await wordService.getUserWords(
+        user._id.toString(),
+        {
+          page,
+          limit,
+        }
+      );
+
+      // 组织一段人类可读的总结文本，方便 GPT 直接展示
+      const summaryLines: string[] = [];
+      if (words.length === 0) {
+        summaryLines.push('你的生词本目前还是空的，可以先在对话中使用“添加单词到生词本”来收集生词。');
+      } else {
+        summaryLines.push(
+          `为你找到了第 ${pagination.page}/${pagination.totalPages} 页的生词，共 ${pagination.total} 个单词，当前页显示 ${words.length} 个：`
+        );
+        summaryLines.push('');
+        for (const w of words) {
+          const level = w.masteryLevel ?? 0;
+          const levelText = `等级 ${level}`;
+          const line = `- ${w.word}：${w.translation}（${levelText}${
+            w.examples && w.examples.length > 0 ? `，例句：${w.examples[0]}` : ''
+          }）`;
+          summaryLines.push(line);
+        }
+      }
+
+      return {
+        content: [
+          {
+            type: 'text' as const,
+            text: summaryLines.join('\n'),
+          },
+        ],
+        structuredContent: {
+          user: {
+            id: user._id.toString(),
+            email: user.email,
+            username: user.username,
+          },
+          pagination,
+          words: words.map((w) => ({
+            id: w._id.toString(),
+            word: w.word,
+            translation: w.translation,
+            masteryLevel: w.masteryLevel,
+            nextReviewAt: w.nextReviewAt,
+            examples: w.examples,
+          })),
         },
       };
     }
