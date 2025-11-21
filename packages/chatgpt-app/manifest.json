@@ -16,16 +16,25 @@
     "user.read"
   ],
   "entry_point": {
-    "type": "iframe",
-    "url": "https://aienglish-frontend.vercel.app/chatgpt-app"
+  "type": "iframe",
+  "url": "https://aienglish-frontend.vercel.app/chatgpt-app"
   },
   "triggers": [
-    {
-      "type": "button",
-      "text": "📝 加入生词本",
-      "description": "将翻译的单词或短语添加到生词本",
-      "placement": ["message_actions"]
+  {
+    "type": "button",
+    "text": "📝 加入生词本",
+    "description": "将翻译的单词或短语添加到生词本",
+    "placement": ["message_actions"]
+  },
+  {
+    "type": "button",
+    "text": "📖 查看我的生词本",
+    "description": "在 ChatGPT 中打开一个页面，查看当前账号下的生词本列表",
+    "placement": ["app_actions"],
+    "parameters": {
+      "mode": "wordbook"
     }
+  }
   ],
   "capabilities": [
     "translation",

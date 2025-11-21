@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { wordAPI, translationAPI, authAPI } from '../../frontend/src/services/api';
-import type { UserRating } from '../../frontend/src/types';
+import type { UserRating, WordRecord } from '../../frontend/src/types';
 
 /**
  * ChatGPT App 页面
@@ -10,6 +10,7 @@ export const ChatGPTAppPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [authChecking, setAuthChecking] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [mode, setMode] = useState<'add' | 'wordbook'>('add'); // add: 加入生词本；wordbook: 查看生词本
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [loginError, setLoginError] = useState<string | null>(null);
@@ -18,8 +19,20 @@ export const ChatGPTAppPage: React.FC = () => {
   const [translation, setTranslation] = useState('');
   const [examples, setExamples] = useState<string[]>([]);
   const [submitted, setSubmitted] = useState(false);
+  const [wordbookLoading, setWordbookLoading] = useState(false);
+  const [wordbookError, setWordbookError] = useState<string | null>(null);
+  const [wordList, setWordList] = useState<WordRecord[]>([]);
 
   useEffect(() => {
+    // 解析 URL 参数，决定当前模式（添加单词 / 查看生词本）
+    const params = new URLSearchParams(window.location.search);
+    const view = params.get('mode');
+    if (view === 'wordbook') {
+      setMode('wordbook');
+    } else {
+      setMode('add');
+    }
+
     // 先检查是否已经登录（本地是否有 authToken）
     const token = typeof window !== 'undefined'
       ? window.localStorage.getItem('authToken')
@@ -30,9 +43,41 @@ export const ChatGPTAppPage: React.FC = () => {
     }
     setAuthChecking(false);
 
-    // 从 URL 参数或 postMessage 接收 ChatGPT 传递的上下文
-    initializeContext();
+    // 只有在“添加单词”模式下才需要上下文
+    if (view !== 'wordbook') {
+      initializeContext();
+    } else {
+      // 查看生词本模式下，不依赖上下文，直接结束 loading，由后续拉取单词列表
+      setLoading(false);
+    }
   }, []);
+
+  /**
+   * 在“查看生词本”模式下，登录完成后拉取单词列表
+   */
+  useEffect(() => {
+    if (!isAuthenticated || mode !== 'wordbook') return;
+
+    const fetchWords = async () => {
+      try {
+        setWordbookError(null);
+        setWordbookLoading(true);
+        const res = await wordAPI.getWords(1, 50);
+        setWordList(res.words);
+      } catch (error: any) {
+        console.error('获取生词本失败:', error);
+        const msg =
+          error?.response?.data?.error ||
+          error?.message ||
+          '获取生词本失败，请稍后重试';
+        setWordbookError(msg);
+      } finally {
+        setWordbookLoading(false);
+      }
+    };
+
+    fetchWords();
+  }, [isAuthenticated, mode]);
 
   const initializeContext = async () => {
     try {
@@ -193,7 +238,7 @@ export const ChatGPTAppPage: React.FC = () => {
           <div className="bg-white rounded-2xl shadow-xl p-8">
             <div className="text-center mb-6">
               <h1 className="text-2xl font-bold text-gray-900 mb-2">
-                登录以使用生词本
+                {mode === 'wordbook' ? '登录以查看生词本' : '登录以使用生词本'}
               </h1>
               <p className="text-sm text-gray-600">
                 第一次在 ChatGPT 中使用本应用，需要先登录你的账号
@@ -262,6 +307,75 @@ export const ChatGPTAppPage: React.FC = () => {
           <p className="text-gray-600">
             "{word}" 已加入生词本
           </p>
+        </div>
+      </div>
+    );
+  }
+
+  // 查看生词本模式
+  if (mode === 'wordbook') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 p-6">
+        <div className="max-w-2xl mx-auto">
+          <div className="bg-white rounded-2xl shadow-xl p-8">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900 mb-1">
+                  我的生词本
+                </h1>
+                <p className="text-sm text-gray-600">
+                  这里展示的是你当前账号下已添加的单词（最多 50 个）
+                </p>
+              </div>
+            </div>
+
+            {wordbookLoading ? (
+              <div className="flex items-center justify-center py-10">
+                <div className="w-10 h-10 border-4 border-primary-600 border-t-transparent rounded-full animate-spin"></div>
+              </div>
+            ) : wordbookError ? (
+              <div className="py-6 text-center text-red-500 text-sm">
+                {wordbookError}
+              </div>
+            ) : wordList.length === 0 ? (
+              <div className="py-10 text-center text-gray-600">
+                还没有任何单词，先在对话中使用“加入生词本”来添加一些吧。
+              </div>
+            ) : (
+              <div className="space-y-4 max-h-[70vh] overflow-y-auto">
+                {wordList.map((item) => (
+                  <div
+                    key={item._id}
+                    className="border border-gray-100 rounded-xl p-4 hover:bg-gray-50 transition-colors"
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-xl font-bold text-gray-900">
+                          {item.word}
+                        </span>
+                        {item.partOfSpeech && (
+                          <span className="text-xs text-gray-500">
+                            {item.partOfSpeech}
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-xs px-2 py-1 rounded-full bg-primary-50 text-primary-700">
+                        等级 {item.masteryLevel}
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-800 mb-1">
+                      {item.translation}
+                    </p>
+                    {item.examples && item.examples.length > 0 && (
+                      <p className="text-xs text-gray-500">
+                        例句：{item.examples[0]}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     );
