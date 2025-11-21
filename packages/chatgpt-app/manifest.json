@@ -4,11 +4,11 @@
   "version": "1.0.0",
   "developer": {
     "name": "Your Name",
-    "url": "https://your-domain.com",
-    "email": "your-email@example.com"
+    "url": "https://aienglish-frontend.vercel.app",
+    "email": "yzdsoft@gmail.com"
   },
   "logo": {
-    "url": "https://your-domain.com/logo.png",
+    "url": "https://aienglish-frontend.vercel.app/logo.png",
     "alt": "AI English Logo"
   },
   "permissions": [
@@ -17,7 +17,7 @@
   ],
   "entry_point": {
     "type": "iframe",
-    "url": "https://your-domain.com/chatgpt-app"
+    "url": "https://aienglish-frontend.vercel.app/chatgpt-app"
   },
   "triggers": [
     {
@@ -32,7 +32,7 @@
     "vocabulary_tracking",
     "spaced_repetition"
   ],
-  "privacy_policy": "https://your-domain.com/privacy",
-  "terms_of_service": "https://your-domain.com/terms"
+  "privacy_policy": "https://aienglish-frontend.vercel.app/privacy",
+  "terms_of_service": "https://aienglish-frontend.vercel.app/terms"
 }
 

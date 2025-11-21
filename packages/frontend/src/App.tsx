@@ -4,6 +4,7 @@ import { HomePage } from './pages/HomePage';
 import { ReviewPage } from './pages/ReviewPage';
 import { WordsPage } from './pages/WordsPage';
 import { Home, BookOpen, Calendar } from 'lucide-react';
+import ChatGPTAppPage from '../../../chatgpt-app/src/ChatGPTAppPage';
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const location = useLocation();
@@ -88,13 +89,24 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 function App() {
   return (
     <BrowserRouter>
-      <Layout>
-        <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/review" element={<ReviewPage />} />
-          <Route path="/words" element={<WordsPage />} />
-        </Routes>
-      </Layout>
+      <Routes>
+        {/* ChatGPT iframe 专用页面：不需要主站导航布局，避免嵌入时出现多余导航 */}
+        <Route path="/chatgpt-app" element={<ChatGPTAppPage />} />
+
+        {/* 其他页面使用带导航的布局 */}
+        <Route
+          path="/*"
+          element={
+            <Layout>
+              <Routes>
+                <Route path="/" element={<HomePage />} />
+                <Route path="/review" element={<ReviewPage />} />
+                <Route path="/words" element={<WordsPage />} />
+              </Routes>
+            </Layout>
+          }
+        />
+      </Routes>
     </BrowserRouter>
   );
 }
