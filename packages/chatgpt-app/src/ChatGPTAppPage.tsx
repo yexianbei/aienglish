@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { wordAPI, translationAPI } from '../../frontend/src/services/api';
+import { wordAPI, translationAPI, authAPI } from '../../frontend/src/services/api';
 import type { UserRating } from '../../frontend/src/types';
 
 /**
@@ -8,6 +8,11 @@ import type { UserRating } from '../../frontend/src/types';
  */
 export const ChatGPTAppPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
+  const [authChecking, setAuthChecking] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginError, setLoginError] = useState<string | null>(null);
   const [context, setContext] = useState<any>(null);
   const [word, setWord] = useState('');
   const [translation, setTranslation] = useState('');
@@ -15,6 +20,16 @@ export const ChatGPTAppPage: React.FC = () => {
   const [submitted, setSubmitted] = useState(false);
 
   useEffect(() => {
+    // 先检查是否已经登录（本地是否有 authToken）
+    const token = typeof window !== 'undefined'
+      ? window.localStorage.getItem('authToken')
+      : null;
+
+    if (token) {
+      setIsAuthenticated(true);
+    }
+    setAuthChecking(false);
+
     // 从 URL 参数或 postMessage 接收 ChatGPT 传递的上下文
     initializeContext();
   }, []);
@@ -34,6 +49,42 @@ export const ChatGPTAppPage: React.FC = () => {
       }
     } catch (error) {
       console.error('初始化上下文失败:', error);
+      setLoading(false);
+    }
+  };
+
+  /**
+   * 处理登录
+   * 第一次在 GPT 中使用时，需要先登录拿到 JWT，否则不允许写入生词本
+   */
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!loginEmail || !loginPassword) {
+      setLoginError('请输入邮箱和密码');
+      return;
+    }
+
+    try {
+      setLoginError(null);
+      setLoading(true);
+
+      const res = await authAPI.login(loginEmail, loginPassword);
+      // 约定后端返回 { token, user: { ... } }
+      if (res.token) {
+        window.localStorage.setItem('authToken', res.token);
+        setIsAuthenticated(true);
+      } else {
+        setLoginError('登录响应异常：未返回 token');
+      }
+    } catch (error: any) {
+      console.error('登录失败:', error);
+      const msg =
+        error?.response?.data?.error ||
+        error?.message ||
+        '登录失败，请检查邮箱和密码';
+      setLoginError(msg);
+    } finally {
       setLoading(false);
     }
   };
@@ -82,6 +133,14 @@ export const ChatGPTAppPage: React.FC = () => {
 
   const handleRating = async (rating: UserRating) => {
     try {
+      // 未登录时不允许写入生词本
+      const token = window.localStorage.getItem('authToken');
+      if (!token) {
+        alert('请先登录后再加入生词本');
+        setIsAuthenticated(false);
+        return;
+      }
+
       setLoading(true);
       
       await wordAPI.addWord(word, translation, rating, context?.fullContext);
@@ -118,6 +177,75 @@ export const ChatGPTAppPage: React.FC = () => {
         <div className="text-center">
           <div className="w-12 h-12 border-4 border-primary-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-gray-600">加载中...</p>
+        </div>
+      </div>
+    );
+  }
+
+  /**
+   * 登录界面
+   * 在 GPT 中第一次使用本 App 时，需要先登录获取 JWT
+   */
+  if (!authChecking && !isAuthenticated && !submitted) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 p-6">
+        <div className="max-w-md mx-auto">
+          <div className="bg-white rounded-2xl shadow-xl p-8">
+            <div className="text-center mb-6">
+              <h1 className="text-2xl font-bold text-gray-900 mb-2">
+                登录以使用生词本
+              </h1>
+              <p className="text-sm text-gray-600">
+                第一次在 ChatGPT 中使用本应用，需要先登录你的账号
+              </p>
+            </div>
+
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  邮箱
+                </label>
+                <input
+                  type="email"
+                  value={loginEmail}
+                  onChange={(e) => setLoginEmail(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  placeholder="your@email.com"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  密码
+                </label>
+                <input
+                  type="password"
+                  value={loginPassword}
+                  onChange={(e) => setLoginPassword(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  placeholder="请输入密码"
+                  required
+                />
+              </div>
+
+              {loginError && (
+                <p className="text-sm text-red-500 mt-2">{loginError}</p>
+              )}
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors font-medium disabled:opacity-50"
+              >
+                {loading ? '登录中...' : '登录并继续'}
+              </button>
+            </form>
+
+            <p className="text-xs text-gray-500 text-center mt-4">
+              提示：你可以复用 Web 端的账号（同一邮箱和密码），这样在网页生词本中也能看到在 ChatGPT 中添加的单词。
+            </p>
+          </div>
         </div>
       </div>
     );
