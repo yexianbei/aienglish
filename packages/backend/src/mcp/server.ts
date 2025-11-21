@@ -14,17 +14,26 @@ const AddWordInputSchema = z.object({
   context: z.string().optional(),
   userRating: z.enum(['unknown', 'vague', 'mastered']).default('unknown'),
   /**
-   * ChatGPT / Developer Mode 提供的用户唯一标识
-   * 在工具调用时需要显式传入（openaiUserId）
+   * 用户在 ChatGPT 中绑定的邮箱（推荐）
+   * 用于在不同设备/浏览器间共享同一个词库
    */
-  openaiUserId: z.string().min(1),
+  email: z.string().email().optional(),
+  /**
+   * ChatGPT / Developer Mode 提供的用户唯一标识（可选）
+   * 如果未提供邮箱，则作为兜底的本地用户标识
+   */
+  openaiUserId: z.string().optional(),
 });
 
 const ViewWordbookInputSchema = z.object({
   /**
-   * ChatGPT / Developer Mode 提供的用户唯一标识
+   * 用户在 ChatGPT 中绑定的邮箱（推荐）
    */
-  openaiUserId: z.string().min(1),
+  email: z.string().email().optional(),
+  /**
+   * ChatGPT / Developer Mode 提供的用户唯一标识（可选）
+   */
+  openaiUserId: z.string().optional(),
   /**
    * 第几页（从 1 开始），默认 1
    */
@@ -44,28 +53,74 @@ const getJwtSecret = () => {
 };
 
 /**
- * 根据 openaiUserId 查找或创建本地用户，并生成后端 JWT
+ * 根据“邮箱 + openaiUserId”查找或创建本地用户，并生成后端 JWT
+ * 优先使用邮箱作为稳定的跨设备标识；如果没有邮箱，则回退到 openaiUserId；
+ * 如果两者都没有，则使用一个稳定的默认 ID。
  */
-const getOrCreateUserAndToken = async (openaiUserId: string) => {
+const getOrCreateUserAndToken = async (identity: {
+  email?: string;
+  openaiUserId?: string;
+}) => {
   await Database.connect();
 
-  let user = await User.findOne({ openaiUserId });
+  const stableEmail = identity.email?.trim().toLowerCase();
+  const stableOpenaiId = identity.openaiUserId || 'chatgpt-default-user';
 
-  if (!user) {
-    const pseudoEmail = `${openaiUserId}@chatgpt.local`;
-    const pseudoUsername = `gpt_${openaiUserId.slice(0, 12)}`;
+  let user;
 
-    user = await User.create({
-      email: pseudoEmail,
-      username: pseudoUsername,
-      password: 'mcp-no-login', // 仅占位，不用于登录
-      openaiUserId,
-    });
+  if (stableEmail) {
+    // 优先使用邮箱作为主键，确保用户跨设备共享同一账号
+    user = await User.findOne({ email: stableEmail });
 
-    Log.success('为 ChatGPT 用户创建本地账号', {
-      openaiUserId,
-      userId: user._id,
-    });
+    if (!user) {
+      const localPart = stableEmail.split('@')[0] || 'user';
+      const baseUsername = `gpt_${localPart.slice(0, 16)}`;
+
+      let finalUsername = baseUsername;
+      let suffix = 1;
+      // 确保用户名唯一
+      // eslint-disable-next-line no-constant-condition
+      while (await User.findOne({ username: finalUsername })) {
+        finalUsername = `${baseUsername}_${suffix}`;
+        suffix += 1;
+        if (suffix > 99) break;
+      }
+
+      user = await User.create({
+        email: stableEmail,
+        username: finalUsername,
+        password: 'mcp-no-login', // 仅占位，不用于密码登录
+        openaiUserId: stableOpenaiId,
+        fromMcp: true,
+      });
+
+      Log.success('为 ChatGPT 用户创建本地账号（基于邮箱）', {
+        email: stableEmail,
+        openaiUserId: stableOpenaiId,
+        userId: user._id,
+      });
+    }
+  } else {
+    // 没有邮箱时，退化到 openaiUserId / 默认 ID
+    user = await User.findOne({ openaiUserId: stableOpenaiId });
+
+    if (!user) {
+      const pseudoEmail = `${stableOpenaiId}@chatgpt.local`;
+      const pseudoUsername = `gpt_${stableOpenaiId.slice(0, 12)}`;
+
+      user = await User.create({
+        email: pseudoEmail,
+        username: pseudoUsername,
+        password: 'mcp-no-login',
+        openaiUserId: stableOpenaiId,
+        fromMcp: true,
+      });
+
+      Log.success('为 ChatGPT 用户创建本地账号（基于 openaiUserId）', {
+        openaiUserId: stableOpenaiId,
+        userId: user._id,
+      });
+    }
   }
 
   const token = jwt.sign(
@@ -96,9 +151,13 @@ export function createMcpServer() {
     async (args) => {
       const input = AddWordInputSchema.parse(args);
 
-      const { user, token } = await getOrCreateUserAndToken(input.openaiUserId);
+      const { user, token } = await getOrCreateUserAndToken({
+        email: input.email,
+        openaiUserId: input.openaiUserId,
+      });
 
       Log.info('MCP add_word 调用', {
+        email: input.email,
         openaiUserId: input.openaiUserId,
         userId: user._id,
         word: input.word,
@@ -152,9 +211,13 @@ export function createMcpServer() {
     async (args) => {
       const input = ViewWordbookInputSchema.parse(args);
 
-      const { user } = await getOrCreateUserAndToken(input.openaiUserId);
+      const { user } = await getOrCreateUserAndToken({
+        email: input.email,
+        openaiUserId: input.openaiUserId,
+      });
 
       Log.info('MCP view_wordbook 调用', {
+        email: input.email,
         openaiUserId: input.openaiUserId,
         userId: user._id,
         page: input.page,
