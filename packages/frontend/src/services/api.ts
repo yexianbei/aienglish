@@ -4,7 +4,8 @@ import type {
   TranslationResponse, 
   Statistics, 
   WordListResponse,
-  UserRating 
+  UserRating,
+  AuthResponse 
 } from '../types';
 
 // 创建 axios 实例
@@ -16,10 +17,12 @@ const api = axios.create({
   },
 });
 
-// 请求拦截器 - 添加用户 ID（简化版，实际应使用 JWT）
+// 请求拦截器 - 添加认证 token（JWT）
 api.interceptors.request.use((config) => {
-  const userId = localStorage.getItem('userId') || 'demo-user';
-  config.headers['x-user-id'] = userId;
+  const token = localStorage.getItem('authToken');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
   return config;
 });
 
@@ -27,10 +30,44 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    if (error.response?.status === 401) {
+      // 未授权时跳转到登录页
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
+    }
     console.error('API 错误:', error);
     throw error;
   }
 );
+
+/**
+ * 认证服务
+ */
+export const authAPI = {
+  /**
+   * 注册（邮箱 + 密码，用户名可选）
+   */
+  register: async (email: string, password: string, username?: string): Promise<AuthResponse> => {
+    const response = await api.post<AuthResponse>('/auth/register', {
+      email,
+      password,
+      username,
+    });
+    return response.data;
+  },
+
+  /**
+   * 登录（邮箱 + 密码）
+   */
+  login: async (email: string, password: string): Promise<AuthResponse> => {
+    const response = await api.post<AuthResponse>('/auth/login', {
+      email,
+      password,
+    });
+    return response.data;
+  },
+};
 
 /**
  * 翻译服务

@@ -5,6 +5,7 @@ import { Database } from './utils/database';
 import { Log } from './utils/logger';
 import { errorHandler, notFoundHandler } from './middleware/error.middleware';
 import wordRoutes from './routes/word.routes';
+import authRoutes from './routes/auth.routes';
 
 // 加载环境变量
 dotenv.config();
@@ -59,7 +60,10 @@ class Server {
       });
     });
 
-    // API 路由
+    // 认证相关路由
+    this.app.use('/api/auth', authRoutes);
+
+    // 单词相关 API 路由（需要认证的在路由内部使用中间件）
     this.app.use('/api/words', wordRoutes);
 
     // API 根路径

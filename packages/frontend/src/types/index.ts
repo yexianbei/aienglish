@@ -79,3 +79,18 @@ export interface WordListResponse {
   pagination: Pagination;
 }
 
+/**
+ * 认证相关
+ */
+export interface AuthUser {
+  id: string;
+  email: string;
+  username: string;
+}
+
+export interface AuthResponse {
+  token: string;
+  user: AuthUser;
+}
+
+

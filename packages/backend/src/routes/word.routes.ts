@@ -1,8 +1,9 @@
-import { Router, Request, Response } from 'express';
+import { Router, Response } from 'express';
 import { WordService } from '../services/word.service';
 import { OpenAIService } from '../services/openai.service';
 import { AddWordRequest, ReviewWordRequest, TranslationRequest } from '../types';
 import { Log } from '../utils/logger';
+import { authMiddleware, AuthenticatedRequest } from '../middleware/auth.middleware';
 
 const router = Router();
 const wordService = new WordService();
@@ -12,7 +13,7 @@ const openaiService = new OpenAIService();
  * POST /api/words/translate
  * 翻译单词或短语
  */
-router.post('/translate', async (req: Request, res: Response) => {
+router.post('/translate', async (req: AuthenticatedRequest, res: Response) => {
   try {
     const request: TranslationRequest = req.body;
     
@@ -33,13 +34,9 @@ router.post('/translate', async (req: Request, res: Response) => {
  * POST /api/words
  * 添加单词到生词本
  */
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const userId = req.headers['x-user-id'] as string; // 简化版，实际应使用 JWT
-    
-    if (!userId) {
-      return res.status(401).json({ error: '未授权' });
-    }
+    const userId = req.userId as string;
 
     const request: AddWordRequest = req.body;
     
@@ -60,9 +57,9 @@ router.post('/', async (req: Request, res: Response) => {
  * POST /api/words/:wordId/review
  * 复习单词
  */
-router.post('/:wordId/review', async (req: Request, res: Response) => {
+router.post('/:wordId/review', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const userId = req.headers['x-user-id'] as string;
+    const userId = req.userId as string;
     const { wordId } = req.params;
     
     if (!userId) {
@@ -91,13 +88,9 @@ router.post('/:wordId/review', async (req: Request, res: Response) => {
  * GET /api/words/today
  * 获取今日待复习单词
  */
-router.get('/today', async (req: Request, res: Response) => {
+router.get('/today', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const userId = req.headers['x-user-id'] as string;
-    
-    if (!userId) {
-      return res.status(401).json({ error: '未授权' });
-    }
+    const userId = req.userId as string;
 
     const words = await wordService.getTodayReviewWords(userId);
     
@@ -112,13 +105,9 @@ router.get('/today', async (req: Request, res: Response) => {
  * GET /api/words
  * 获取用户的所有单词
  */
-router.get('/', async (req: Request, res: Response) => {
+router.get('/', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const userId = req.headers['x-user-id'] as string;
-    
-    if (!userId) {
-      return res.status(401).json({ error: '未授权' });
-    }
+    const userId = req.userId as string;
 
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 20;
@@ -143,13 +132,9 @@ router.get('/', async (req: Request, res: Response) => {
  * GET /api/words/statistics
  * 获取学习统计
  */
-router.get('/statistics', async (req: Request, res: Response) => {
+router.get('/statistics', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const userId = req.headers['x-user-id'] as string;
-    
-    if (!userId) {
-      return res.status(401).json({ error: '未授权' });
-    }
+    const userId = req.userId as string;
 
     const statistics = await wordService.getStatistics(userId);
     
@@ -164,9 +149,9 @@ router.get('/statistics', async (req: Request, res: Response) => {
  * DELETE /api/words/:wordId
  * 删除单词
  */
-router.delete('/:wordId', async (req: Request, res: Response) => {
+router.delete('/:wordId', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const userId = req.headers['x-user-id'] as string;
+    const userId = req.userId as string;
     const { wordId } = req.params;
     
     if (!userId) {
