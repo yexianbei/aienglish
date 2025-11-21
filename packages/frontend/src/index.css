@@ -4,11 +4,13 @@
 
 @layer base {
   * {
-    @apply border-border;
+    /* 这里原来使用了不存在的 border-border 类，改成 Tailwind 内置的边框颜色 */
+    @apply border-slate-200;
   }
   
   body {
-    @apply bg-background text-foreground;
+    /* 同样将 bg-background / text-foreground 改成 Tailwind 内置颜色，避免构建报错 */
+    @apply bg-white text-slate-900;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
 }
