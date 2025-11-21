@@ -145,22 +145,22 @@ const getOrCreateUserAndToken = async (identity: {
     // 没有邮箱时，退化到 openaiUserId / 默认 ID
     user = await User.findOne({ openaiUserId: stableOpenaiId });
 
-    if (!user) {
+  if (!user) {
       const pseudoEmail = `${stableOpenaiId}@chatgpt.local`;
       const pseudoUsername = `gpt_${stableOpenaiId.slice(0, 12)}`;
 
-      user = await User.create({
-        email: pseudoEmail,
-        username: pseudoUsername,
+    user = await User.create({
+      email: pseudoEmail,
+      username: pseudoUsername,
         password: 'mcp-no-login',
         openaiUserId: stableOpenaiId,
         fromMcp: true,
-      });
+    });
 
       Log.success('为 ChatGPT 用户创建本地账号（基于 openaiUserId）', {
         openaiUserId: stableOpenaiId,
-        userId: user._id,
-      });
+      userId: user._id,
+    });
     }
   }
 
