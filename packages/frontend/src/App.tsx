@@ -4,7 +4,7 @@ import { HomePage } from './pages/HomePage';
 import { ReviewPage } from './pages/ReviewPage';
 import { WordsPage } from './pages/WordsPage';
 import { Home, BookOpen, Calendar } from 'lucide-react';
-import ChatGPTAppPage from '../../../chatgpt-app/src/ChatGPTAppPage';
+import ChatGPTAppPage from './pages/ChatGPTAppPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 
