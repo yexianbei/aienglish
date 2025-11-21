@@ -6,6 +6,7 @@ import { Log } from './utils/logger';
 import { errorHandler, notFoundHandler } from './middleware/error.middleware';
 import wordRoutes from './routes/word.routes';
 import authRoutes from './routes/auth.routes';
+import { mcpHandler } from './mcp/router';
 
 // 加载环境变量
 dotenv.config();
@@ -58,6 +59,11 @@ class Server {
         timestamp: new Date().toISOString(),
         uptime: process.uptime()
       });
+    });
+
+    // MCP Server 路由（供 ChatGPT Apps SDK 使用）
+    this.app.all('/mcp', (req, res) => {
+      void mcpHandler(req, res);
     });
 
     // 认证相关路由
