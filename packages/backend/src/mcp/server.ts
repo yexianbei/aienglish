@@ -44,6 +44,47 @@ const ViewWordbookInputSchema = z.object({
   limit: z.number().int().min(1).max(50).optional().default(20),
 });
 
+/**
+ * 获取“今日待复习单词”列表的输入参数
+ * 复用 email / openaiUserId 作为用户标识
+ */
+const TodayReviewInputSchema = z.object({
+  /**
+   * 用户在 ChatGPT 中绑定的邮箱（推荐）
+   */
+  email: z.string().email().optional(),
+  /**
+   * ChatGPT / Developer Mode 提供的用户唯一标识（可选）
+   */
+  openaiUserId: z.string().optional(),
+  /**
+   * 本次最多取多少个单词，默认 10，最大 50
+   */
+  limit: z.number().int().min(1).max(50).optional().default(10),
+});
+
+/**
+ * 对单个单词进行“复习打分”的输入参数
+ */
+const ReviewWordInputSchema = z.object({
+  /**
+   * 用户在 ChatGPT 中绑定的邮箱（推荐）
+   */
+  email: z.string().email().optional(),
+  /**
+   * ChatGPT / Developer Mode 提供的用户唯一标识（可选）
+   */
+  openaiUserId: z.string().optional(),
+  /**
+   * 要复习的单词记录 ID
+   */
+  wordId: z.string().min(1),
+  /**
+   * 用户本次的记忆评分
+   */
+  userRating: z.enum(['unknown', 'vague', 'mastered']),
+});
+
 const getJwtSecret = () => {
   const secret = process.env.JWT_SECRET;
   if (!secret) {
@@ -276,6 +317,160 @@ export function createMcpServer() {
             nextReviewAt: w.nextReviewAt,
             examples: w.examples,
           })),
+        },
+      };
+    }
+  );
+
+  /**
+   * 工具：获取“今日待复习”的单词列表
+   * 按照艾宾浩斯曲线计算好的 nextReviewAt，从中筛选出今天应该复习的单词。
+   * 通常在用户说“我要复习单词”时调用，由 GPT 再逐个出题。
+   */
+  server.registerTool(
+    'get_today_review_words',
+    {
+      title: '获取今日待复习单词',
+      description:
+        '根据艾宾浩斯记忆曲线，为当前用户获取今天应该复习的单词列表（未完成的部分）。',
+      inputSchema: TodayReviewInputSchema,
+    },
+    async (args) => {
+      const input = TodayReviewInputSchema.parse(args);
+
+      const { user } = await getOrCreateUserAndToken({
+        email: input.email,
+        openaiUserId: input.openaiUserId,
+      });
+
+      Log.info('MCP get_today_review_words 调用', {
+        email: input.email,
+        openaiUserId: input.openaiUserId,
+        userId: user._id,
+        limit: input.limit,
+      });
+
+      // 取出“今日待复习”的单词（内部已按 nextReviewAt <= now 过滤）
+      const allTodayWords = await wordService.getTodayReviewWords(
+        user._id.toString()
+      );
+      const words = allTodayWords.slice(0, input.limit);
+
+      const summaryLines: string[] = [];
+      if (words.length === 0) {
+        summaryLines.push(
+          '太棒了！你今天的所有复习任务都已经完成了，没有待复习的单词。'
+        );
+      } else {
+        summaryLines.push(
+          `为你找到了 ${allTodayWords.length} 个“今日待复习”的单词，本次先取前 ${words.length} 个：`
+        );
+        summaryLines.push('');
+        for (const w of words) {
+          const level = w.masteryLevel ?? 0;
+          const levelText = `等级 ${level}`;
+          const line = `- ${w.word}：${w.translation}（${levelText}）`;
+          summaryLines.push(line);
+        }
+        summaryLines.push('');
+        summaryLines.push(
+          '建议：逐个拿这些单词来出题，让用户回答含义或造句，再根据记忆情况调用 review_word 工具打分。'
+        );
+      }
+
+      return {
+        content: [
+          {
+            type: 'text' as const,
+            text: summaryLines.join('\n'),
+          },
+        ],
+        structuredContent: {
+          user: {
+            id: user._id.toString(),
+            email: user.email,
+            username: user.username,
+          },
+          totalToday: allTodayWords.length,
+          words: words.map((w) => ({
+            id: w._id.toString(),
+            word: w.word,
+            translation: w.translation,
+            masteryLevel: w.masteryLevel,
+            nextReviewAt: w.nextReviewAt,
+            examples: w.examples,
+          })),
+        },
+      };
+    }
+  );
+
+  /**
+   * 工具：对单个单词进行“复习打分”
+   * 根据用户反馈（不认识/模糊/掌握）更新掌握等级和下次复习时间，从而继续沿用艾宾浩斯曲线。
+   */
+  server.registerTool(
+    'review_word',
+    {
+      title: '复习单个单词并打分',
+      description:
+        '在用户复习完某个单词后，根据其记忆情况进行打分（不认识/模糊/掌握），系统会自动调整该单词的掌握等级和下次复习时间。',
+      inputSchema: ReviewWordInputSchema,
+    },
+    async (args) => {
+      const input = ReviewWordInputSchema.parse(args);
+
+      const { user } = await getOrCreateUserAndToken({
+        email: input.email,
+        openaiUserId: input.openaiUserId,
+      });
+
+      Log.info('MCP review_word 调用', {
+        email: input.email,
+        openaiUserId: input.openaiUserId,
+        userId: user._id,
+        wordId: input.wordId,
+        userRating: input.userRating,
+      });
+
+      const updated = await wordService.reviewWord(user._id.toString(), {
+        wordId: input.wordId,
+        userRating: input.userRating,
+      });
+
+      const ratingText =
+        input.userRating === 'unknown'
+          ? '不认识'
+          : input.userRating === 'vague'
+          ? '有点模糊'
+          : '已经掌握';
+
+      const summary = `已根据你的反馈（${ratingText}）更新单词 "${updated.word}"：当前掌握等级为 ${updated.masteryLevel}，下次复习时间为 ${
+        updated.nextReviewAt
+          ? new Date(updated.nextReviewAt).toLocaleString()
+          : '未设定'
+      }。`;
+
+      return {
+        content: [
+          {
+            type: 'text' as const,
+            text: summary,
+          },
+        ],
+        structuredContent: {
+          user: {
+            id: user._id.toString(),
+            email: user.email,
+            username: user.username,
+          },
+          word: {
+            id: updated._id.toString(),
+            word: updated.word,
+            translation: updated.translation,
+            masteryLevel: updated.masteryLevel,
+            nextReviewAt: updated.nextReviewAt,
+          },
         },
       };
     }
