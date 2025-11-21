@@ -34,9 +34,19 @@ class Server {
       credentials: true
     }));
 
-    // Body 解析
-    this.app.use(express.json());
-    this.app.use(express.urlencoded({ extended: true }));
+    // Body 解析（跳过 /mcp 路径，避免干扰 MCP 流式传输）
+    this.app.use((req, res, next) => {
+      if (req.path.startsWith('/mcp')) {
+        return next();
+      }
+      return express.json()(req, res, next);
+    });
+    this.app.use((req, res, next) => {
+      if (req.path.startsWith('/mcp')) {
+        return next();
+      }
+      return express.urlencoded({ extended: true })(req, res, next);
+    });
 
     // 请求日志
     this.app.use((req, res, next) => {
@@ -61,8 +71,8 @@ class Server {
       });
     });
 
-    // MCP Server 路由（供 ChatGPT Apps SDK 使用）
-    this.app.all('/mcp', (req, res) => {
+    // MCP Server 路由（供 ChatGPT Apps SDK 使用，包含子路径如 /mcp/actions）
+    this.app.all(['/mcp', '/mcp/*'], (req, res) => {
       void mcpHandler(req, res);
     });
 
